@@ -36,3 +36,10 @@ Render 무료 Node web service: build `npm ci`, start `npm start`.
 - 토큰 재접속, 방장 자동 위임. 차례인 선수가 30초 이상 연결 해제면 방장이 남은 결과를 버리고 다음 차례 진행 가능.
 - 서버 재시작 또는 전원 연결 해제 후 1시간이 지나면 방 초기화.
 - 검증: `npm test`, `node yut-multiplayer-check.mjs`.
+
+## Omok and Janggi
+- `/omok`: 15×15, free / exact-five; host can enable black-only forbidden moves in lobby. Enabled mode uses exact-five black and five-or-more white. Server rejects double-three, double-four and overline atomically; true-three detection recursively checks legal open-four extensions. Exact five has precedence. No tournament swap/opening protocol.
+- `/janggi`: 9×10; four horse/elephant setups, palace diagonals, blocked horse/elephant paths, cannon screens, check legality and mate. Friendly draw rules: agreement, bikjang acceptance, two passes, third repeated position. No tournament material scoring.
+- Both: two players, up to 20 spectators; first player hosts; chat, rematch, resign, draw offer, token-authenticated reconnection and host transfer. In-memory rooms expire after one hour empty or on server restart.
+- Rule references: https://www.renju.net/rifrules/ and https://www.pychess.org/variants/janggi . Rules engine is independently implemented.
+- Tests: `npm test`; `node board-multiplayer-check.mjs` (four simultaneous sockets for each game).

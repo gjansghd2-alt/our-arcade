@@ -2,9 +2,10 @@ import {randomInt,randomUUID} from 'node:crypto';
 export const names={[-1]:'빽도',1:'도',2:'개',3:'걸',4:'윷',5:'모'};
 export function result(mask,backdo=true){const sticks=Array.from({length:4},(_,i)=>(mask>>i)&1);const n=sticks.reduce((a,b)=>a+b,0);return {steps:backdo&&n===1&&sticks[0]?-1:n===0?5:n,name:names[backdo&&n===1&&sticks[0]?-1:n===0?5:n],sticks};}
 export function createGame(players,mode='team',backdo=true){
- if(mode==='team'){if(players.length<4||players.length>8||players.length%2)throw Error('팀전은 2대2·3대3·4대4로 시작해주세요.');const a=players.filter(p=>p.team===0),b=players.filter(p=>p.team===1);if(a.length!==b.length)throw Error('두 팀의 인원을 같게 맞춰주세요.');}
- else if(players.length<2||players.length>4)throw Error('개인전은 2~4명이 필요해요.');
- const teams=mode==='team'?[0,1].map(t=>players.filter(p=>p.team===t).map(p=>p.id)):players.map(p=>[p.id]);
+ const teamCount={team:2,team3:3,team4:4}[mode];
+ if(teamCount){const sizes=Array.from({length:teamCount},(_,t)=>players.filter(p=>p.team===t).length);if(players.some(p=>!Number.isInteger(p.team)||p.team<0||p.team>=teamCount)||sizes.some(n=>n!==sizes[0])||sizes[0]<2||players.length>8||(teamCount>2&&sizes[0]!==2))throw Error(teamCount===2?'2팀전은 2대2·3대3·4대4로 맞춰주세요.':teamCount+'팀전은 팀당 2명씩 필요해요.');}
+ else if(mode!=='solo'||players.length<2||players.length>4)throw Error('개인전은 2~4명이 필요해요.');
+ const teams=teamCount?Array.from({length:teamCount},(_,t)=>players.filter(p=>p.team===t).map(p=>p.id)):players.map(p=>[p.id]);
  return {id:randomUUID(),mode,backdo,teams,team:0,cursors:teams.map(()=>0),turn:teams[0][0],pieces:teams.map(()=>Array.from({length:4},()=>({pos:-1,trail:[]}))),throws:1,pending:[],lastThrow:null,sequence:0,finished:false,winner:null,log:[]};
 }
 function log(g,text){g.log.push(text);g.log=g.log.slice(-60);}

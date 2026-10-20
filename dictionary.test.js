@@ -33,3 +33,31 @@ test('rejection and outage preserve remaining time; disconnected game cannot be 
   assert.equal(g.checking,false);assert.equal(g.sequence,0);assert.equal(g.lives.a,3);assert.equal(g.deadline,mode==='disconnect'?null:19000);
  }
 });
+
+test('official offline snapshot accepts every extracted word without credentials or network',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const {lookupWord,dictionaryInfo}=await import('./dictionary.js');
+ const data=JSON.parse(readFileSync(new URL('./dictionary-data.json',import.meta.url)));
+ assert.equal(data.sourceFiles,25);assert.equal(data.sourceEntries,1229530);
+ assert.equal(dictionaryInfo.snapshot,'2026-10-04');assert.equal(dictionaryInfo.wordCount,97068);
+ assert.equal(new Set(data.words).size,data.wordCount);
+ const oldFetch=globalThis.fetch;globalThis.fetch=()=>{throw Error('Network must not be needed');};
+ try{
+  for(const word of data.words){assert.match(word,/^[가-힣]{2}$/);assert.equal(await lookupWord(word),true,word);}
+  assert.equal(await lookupWord('가방'.normalize('NFD')),true);
+  for(const word of ['뷁뷁','abc','가방끈','ㄱㅂ','<script>'])assert.equal(await lookupWord(word),false);
+ }finally{globalThis.fetch=oldFetch;}
+});
+
+test('new offline word advances once; duplicate and wrong initials remain rejected',async()=>{
+ const {lookupWord}=await import('./dictionary.js');
+ const {dictionary,initials}=await import('./words.js');
+ assert.equal(dictionary.has('감귤'),false);assert.equal(await lookupWord('감귤'),true);
+ const g=newGame(['a','b','c','d'],15,1000);g.prompt=initials('감귤');
+ await submitChecked(g,'a','감귤',0,lookupWord,()=>{},()=>2000);
+ assert.equal(g.turn,'b');assert.equal(g.scores.a,1);assert.equal(g.sequence,1);
+ g.prompt=initials('감귤');
+ await assert.rejects(submitChecked(g,'b','감귤',1,lookupWord,()=>{},()=>2100),/이미 나온/);
+ await assert.rejects(submitChecked(g,'b','사과',1,lookupWord,()=>{},()=>2100),/초성/);
+ assert.equal(g.sequence,1);
+});

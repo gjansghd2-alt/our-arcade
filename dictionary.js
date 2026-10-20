@@ -1,3 +1,7 @@
+import {readFileSync} from 'node:fs';
+const snapshot=JSON.parse(readFileSync(new URL('./dictionary-data.json',import.meta.url),'utf8'));
+const offlineWords=new Set(snapshot.words);
+export const dictionaryInfo={source:snapshot.source,snapshot:snapshot.snapshot,wordCount:offlineWords.size,sourceEntries:snapshot.sourceEntries};
 const unavailable='사전에 연결하지 못했어요. 남은 시간은 유지돼요. 다시 시도해주세요.';
 export function createDictionary({key,fetchImpl=fetch,timeout=4000,clock=Date.now}={}){
  const cache=new Map(),pending=new Map();
@@ -25,5 +29,11 @@ export function createDictionary({key,fetchImpl=fetch,timeout=4000,clock=Date.no
   pending.set(word,task);return task;
  };
 }
-export const dictionaryEnabled=!!process.env.OPENDICT_API_KEY;
-export const lookupWord=createDictionary({key:process.env.OPENDICT_API_KEY});
+export const dictionaryEnabled=true;
+const remoteLookup=process.env.OPENDICT_API_KEY?createDictionary({key:process.env.OPENDICT_API_KEY}):null;
+export async function lookupWord(word){
+ const value=String(word||'').trim().normalize('NFC');
+ if(!/^[가-힣]{2}$/.test(value))return false;
+ if(offlineWords.has(value))return true;
+ return remoteLookup?remoteLookup(value):false;
+}

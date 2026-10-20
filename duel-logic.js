@@ -151,7 +151,7 @@ export function viewDuel(g,s){
  if(['pictures','numbers'].includes(g.kind)){v.board=g.hidden.map((c,i)=>g.finished||g.phase==='memorize'||g.reveal?.includes(i)?c:null);if(g.kind==='pictures')Object.assign(v,{belts:g.belts,positions:g.positions});else v.target=g.target;}
  if(g.kind==='monorail')Object.assign(v,{tiles:g.tiles,left:g.left,challenge:g.challenge});
  if(g.kind==='quattro')Object.assign(v,{hands:g.hands.map((h,p)=>h.map((c,i)=>g.finished||p===s||g.open[p].includes(i)?c:null)),open:g.open,ready:g.ready,mulligans:g.mulligans,used:g.used,pass:g.pass});
- if(g.kind==='rpsbet')Object.assign(v,{chips:g.chips,opponent:g.opponent,fighter:g.fighter});
+ if(g.kind==='rpsbet')Object.assign(v,{chips:g.chips,opponent:g.phase==='bet'&&s>=0&&s!==g.fighter?g.opponent:null,fighter:g.fighter});
  if(g.kind==='strategyyut')Object.assign(v,{pieces:g.pieces,steps:g.steps,lastChoices:g.lastChoices,submitted:g.choices.map(c=>c!==null),mine:s>=0?g.choices[s]:null});
  return structuredClone(v);
 }

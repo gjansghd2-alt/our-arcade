@@ -1,3 +1,4 @@
+import {initMatgo,actMatgo,viewMatgo} from './matgo-logic.js';
 import {randomInt,randomUUID} from 'node:crypto';
 import {catalog} from './duel-catalog.js';
 import {destination} from './yut-logic.js';
@@ -10,6 +11,7 @@ const turn=(g,s)=>need(g.turn===s,'상대 차례예요.');
 export function createDuel(kind,players,now=Date.now()){
  need(Object.hasOwn(catalog,kind)&&players.length===catalog[kind].players);
  const g={id:randomUUID(),kind,players,sequence:0,turn:randomInt(2),first:0,round:1,scores:[0,0],finished:false,winner:null,phase:'play',deadline:null,log:[]};g.first=g.turn;
+ if(kind==='matgo')initMatgo(g,shuffle);
  if(kind==='blackwhite'){g.hands=[range(9),range(9)];g.picks=[null,null];g.history=[];}
  if(kind==='indian'||kind==='doublepoker'){g.chips=kind==='indian'?[30,30]:[40,40];g.pot=0;g.deck=[];dealPoker(g);}
  if(kind==='gyulhap')newHap(g,now);
@@ -118,7 +120,8 @@ export function actDuel(g,s,a,now=Date.now()){
  need(!g.finished&&Number.isInteger(s)&&s>=0&&s<g.players.length);need(a&&typeof a==='object');
  if(a.op==='resign'){finishDuel(g,s%2===0?1:0,'기권');g.sequence++;return;}
  if(['indian','doublepoker'].includes(g.kind)&&g.phase==='between'){need(a.op==='ready');g.ready[s]=true;if(g.ready.every(Boolean)){g.round++;dealPoker(g);}g.sequence++;return;}
- if(g.kind==='blackwhite'){turn(g,s);need(a.op==='tile'&&g.hands[s].includes(a.value));g.hands[s]=g.hands[s].filter(v=>v!==a.value);g.picks[s]=a.value;if(g.picks.every(v=>v!==null)){const w=g.picks[0]===g.picks[1]?null:g.picks[0]>g.picks[1]?0:1;g.history.push({colors:g.picks.map(n=>n%2),values:[...g.picks],winner:w});if(w!==null){g.scores[w]++;g.first=w;}note(g,'대결 '+g.round+' · '+(w===null?'무승부':(w+1)+'번 승리'));g.picks=[null,null];if(g.round===9)scoreEnd(g);else{g.round++;g.turn=g.first;}}else g.turn=1-s;}
+ if(g.kind==='matgo')actMatgo(g,s,a);
+ else if(g.kind==='blackwhite'){turn(g,s);need(a.op==='tile'&&g.hands[s].includes(a.value));g.hands[s]=g.hands[s].filter(v=>v!==a.value);g.picks[s]=a.value;if(g.picks.every(v=>v!==null)){const w=g.picks[0]===g.picks[1]?null:g.picks[0]>g.picks[1]?0:1;g.history.push({colors:g.picks.map(n=>n%2),values:[...g.picks],winner:w});if(w!==null){g.scores[w]++;g.first=w;}note(g,'대결 '+g.round+' · '+(w===null?'무승부':(w+1)+'번 승리'));g.picks=[null,null];if(g.round===9)scoreEnd(g);else{g.round++;g.turn=g.first;}}else g.turn=1-s;}
  else if(['indian','doublepoker'].includes(g.kind))poker(g,s,a);
  else if(g.kind==='gyulhap')hap(g,s,a,now);
  else if(g.kind==='twelve')twelve(g,s,a,now);
@@ -144,6 +147,7 @@ export function tickDuel(g,now=Date.now()){
 // Explicit per-recipient projection: never send hidden state as a catch-all object.
 export function viewDuel(g,s){
  const v={};for(const k of ['id','kind','players','sequence','turn','round','scores','finished','winner','reason','phase','deadline','paused','log'])v[k]=g[k];v.seat=s;
+ if(g.kind==='matgo')Object.assign(v,viewMatgo(g,s));
  if(g.kind==='blackwhite'){v.hand=s>=0?g.hands[s]:[];v.counts=g.hands.map(a=>a.length);v.colors=g.picks.map(n=>n===null?null:n%2);v.history=g.history.map(h=>({colors:h.colors,winner:h.winner,mine:s>=0?h.values[s]:null,...(g.finished?{values:h.values}:{})}));}
  if(['indian','doublepoker'].includes(g.kind)){Object.assign(v,{chips:g.chips,pot:g.pot,bet:g.bet,sides:g.sides,ready:g.ready,lastCards:g.lastCards,lastSides:g.lastSides});v.cards=g.kind==='indian'?g.cards.map((c,i)=>g.finished||g.phase==='between'||s>=0&&i!==s?c:null):g.cards.map((c,i)=>[c[0],g.finished||g.phase==='between'||s===i?c[1]:null]);}
  if(g.kind==='gyulhap')Object.assign(v,{cards:g.cards,found:g.found});

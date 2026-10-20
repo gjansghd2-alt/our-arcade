@@ -1,11 +1,14 @@
+import {renderMatgo} from './matgo-ui.js';
 import {catalog} from './duel-catalog.js';
 const $=s=>document.querySelector(s),el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
-const query=new URLSearchParams(location.search),kind=query.get('game'),meta=Object.hasOwn(catalog,kind)?catalog[kind]:null;
-if(!meta){for(const[k,m]of Object.entries(catalog)){const a=el('a',undefined,'duel-card');a.href='/duel?game='+k;a.style.setProperty('--accent',m.color);a.append(el('small',m.tag+' · '+m.players+'명'),el('div',m.icon,'symbol'),el('h2',m.name),el('p',m.desc),el('span','대결하러 가기 →','enter'));$('#catalog').append(a);}}
+const query=new URLSearchParams(location.search),kind=location.pathname.startsWith('/matgo')?'matgo':query.get('game'),meta=Object.hasOwn(catalog,kind)?catalog[kind]:null;
+if(!meta){for(const[k,m]of Object.entries(catalog)){if(m.standalone)continue;const a=el('a',undefined,'duel-card');a.href='/duel?game='+k;a.style.setProperty('--accent',m.color);a.append(el('small',m.tag+' · '+m.players+'명'),el('div',m.icon,'symbol'),el('h2',m.name),el('p',m.desc),el('span','대결하러 가기 →','enter'));$('#catalog').append(a);}}
 else init();
 function init(){
- $('#catalog').hidden=true;$('#room').hidden=false;$('#title').textContent=meta.name;$('#subtitle').textContent=meta.desc;$('#rules').textContent=meta.rules;$('#capacity').textContent=meta.players+'인 + 관전';document.title=meta.name+' · 데스매치 클럽';document.documentElement.style.setProperty('--accent',meta.color);
- let room=query.get('room');if(!room){room=crypto.randomUUID();history.replaceState(null,'','/duel?game='+kind+'&room='+room);}$('#invite').value=location.href;
+ if(kind==='matgo'){document.body.classList.add('matgopage');const css=el('link');css.rel='stylesheet';css.href='/matgo.css';document.head.append(css);document.querySelector('nav a:last-child').textContent='우리끼리 맞고 🎴';document.querySelector('nav a:last-child').href='/matgo';document.querySelector('header .eyebrow').textContent='FORTY-EIGHT CARDS. ONE MORE GO.';document.querySelectorAll('.hero-art span').forEach((e,i)=>e.textContent=['松','光','桐'][i]);document.querySelector('footer').textContent='우리끼리 오락실 · 돈 없이 점수로 즐기는 맞고. 서버 재시작 시 방과 기록은 초기화됩니다.';}
+
+ $('#catalog').hidden=true;$('#room').hidden=false;$('#title').textContent=meta.name;$('#subtitle').textContent=meta.desc;$('#rules').textContent=kind==='matgo'?meta.rules.replaceAll('. ','.\n\n'):meta.rules;$('#capacity').textContent=meta.players+'인 + 관전';document.title=meta.name+(kind==='matgo'?' · 우리끼리 오락실':' · 데스매치 클럽');document.documentElement.style.setProperty('--accent',meta.color);
+ let room=query.get('room');if(!room){room=crypto.randomUUID();history.replaceState(null,'',kind==='matgo'?'/matgo?room='+room:'/duel?game='+kind+'&room='+room);}$('#invite').value=location.href;
  const key='duel-'+kind+'-'+room;let creds;try{creds=JSON.parse(localStorage.getItem(key)||sessionStorage.getItem(key)||'null');}catch{}if(!creds)creds={id:crypto.randomUUID()};if(creds.nick)$('#nick').value=creds.nick;
  let ws,state,joined=false,selected=[],from=null,drop=null,draft=[],rotation=0,side=0,lastSeq=null,clockOffset=0;
  const notice=t=>$('#notice').textContent=t;
@@ -28,9 +31,10 @@ function init(){
  const seq=g?.id+':'+g?.sequence;if(seq!==lastSeq){lastSeq=seq;selected=[];from=null;drop=null;draft=[];notice('');}
  const log=$('#chatlog'),bottom=log.scrollHeight-log.scrollTop-log.clientHeight<60;log.replaceChildren(...state.chat.map(m=>{const d=el('div',undefined,'message');d.append(el('b',m.nick),el('span',m.text));return d;}));if(bottom)log.scrollTop=log.scrollHeight;
  $('#history').replaceChildren(...(g?.log||[]).slice().reverse().map(t=>el('p',t)));$('#score').replaceChildren();if(g)for(let s=0;s<2;s++){const d=el('div',undefined,'scorebox');d.append(el('span',name(s)),el('b',g.chips?g.chips[s]+'칩':g.scores[s]+'점'));$('#score').append(d);}
- $('#phase').textContent=g?g.round+' ROUND · '+({play:'대결',between:'라운드 결과',finished:'최종 결과',memorize:'기억하세요',peek:'힌트 공개',buzz:'버저 대기',answer:'정답 입력',bonus:'결 추가 기회',open:'카드 공개',mulligan:'첫 패 선택',exchange:'교환',role:'역할 선택',fight:'비밀 제출',bet:'예측',choose:'윷 선택',move:'말 이동',reveal:'결과 공개'}[g.phase]||g.phase):'WAITING';
+ $('#phase').textContent=g?(kind==='matgo'?(g.moves+1)+'번째 차례 · ':g.round+' ROUND · ')+({choosehand:'바닥 패 선택',chooseflip:'뒤집은 패 짝 선택',gostop:'고 / 스톱',gukjin:'국진 선택',play:'대결',between:'라운드 결과',finished:'최종 결과',memorize:'기억하세요',peek:'힌트 공개',buzz:'버저 대기',answer:'정답 입력',bonus:'결 추가 기회',open:'카드 공개',mulligan:'첫 패 선택',exchange:'교환',role:'역할 선택',fight:'비밀 제출',bet:'예측',choose:'윷 선택',move:'말 이동',reveal:'결과 공개'}[g.phase]||g.phase):'WAITING';
  $('#turn').textContent=!g?'친구를 초대해 주세요.':g.finished?g.winner===null?'무승부':name(g.winner)+' 승리!':g.paused?'선수가 돌아오면 이어서 진행해요':g.turn<0?'먼저 버저를 누르세요':name(g.turn)+' 차례'+(g.seat===g.turn?' · 내 차례!':'');renderGame();clock();}
  function renderGame(){const root=$('#game');root.replaceChildren();const g=state?.game;if(!g)return;const s=g.seat,active=joined&&s>=0&&!g.finished&&!g.paused,my=active&&g.turn===s;
+ if(kind==='matgo'){renderMatgo(root,g,{action,my,active,name});return;}
  if(g.finished)root.append(el('p',g.reason,'helpbox'));
  if(kind==='blackwhite'){
   root.append(label('상대 숫자는 숨겨져요. 짝수=흑 / 홀수=백.'),controls(...g.colors.map((c,i)=>card(c===null?'대기':c?'백':'흑',name(i)+' 제출'))));

@@ -43,3 +43,7 @@ Render 무료 Node web service: build `npm ci`, start `npm start`.
 - Both: two players, up to 20 spectators; first player hosts; chat, rematch, resign, draw offer, token-authenticated reconnection and host transfer. In-memory rooms expire after one hour empty or on server restart.
 - Rule references: https://www.renju.net/rifrules/ and https://www.pychess.org/variants/janggi . Rules engine is independently implemented.
 - Tests: `npm test`; `node board-multiplayer-check.mjs` (four simultaneous sockets for each game).
+
+## 데스매치 클럽
+
+`/duel`에 시즌4 목록의 데스매치 11종을 추가했습니다. 초대방, 관전, 채팅, 토큰 복귀 및 재경기를 지원합니다. 전략 윷놀이는 4인, 나머지는 2인입니다. 원작과 구분한 온라인 변경점 및 검증 방법은 [DEATHMATCH.md](DEATHMATCH.md)를 참고하세요.

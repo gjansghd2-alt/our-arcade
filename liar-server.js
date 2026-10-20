@@ -9,7 +9,7 @@ export function attachLiar(ws,req){
  const id=url.searchParams.get('room');if(!id||!/^[\w-]{10,80}$/.test(id)){ws.close(1008);return true;}
  let r=rooms.get(id);if(!r){if(rooms.size>=1000){ws.close(1013);return true;}r={clients:new Set(),members:new Map(),host:null,category:'랜덤',rounds:2,game:null,chat:[],last:Date.now()};rooms.set(id,r);}r.clients.add(ws);
  ws.on('message',raw=>{try{
- const now=Date.now();if(now-(ws.window||0)>1000){ws.window=now;ws.count=0;}if(++ws.count>20)throw Error('잠시 후 다시 시도해주세요.');const m=JSON.parse(raw);
+ const now=Date.now();if(now-(ws.window||0)>1000){ws.window=now;ws.count=0;}if(++ws.count>20)throw Error('잠시 후 다시 시도해주세요.');const m=JSON.parse(raw);if(m?.type==='heartbeat'){send(ws,{type:'heartbeat'});return;}
  if(m.type==='join'){
  if(ws.pid)throw Error('이미 입장했어요.');if(typeof m.id!=='string'||!/^[\w-]{16,80}$/.test(m.id))throw Error('잘못된 참가자입니다.');
  const existing=r.members.get(m.id);if(existing){if(existing.token!==m.token)throw Error('재접속 인증 실패');ws.pid=m.id;existing.offlineAt=null;for(const c of r.clients)if(c!==ws&&c.pid===m.id)c.close(1000,'Reconnected');}

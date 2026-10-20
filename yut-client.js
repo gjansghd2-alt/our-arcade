@@ -1,3 +1,12 @@
+// Application heartbeat also works through proxies that answer protocol pings.
+function attachClientHeartbeat(socket) {
+  let lastSeen=Date.now();
+  const beat=()=>{if(Date.now()-lastSeen>60000){socket.close();return;}if(socket.readyState===1)socket.send(JSON.stringify({type:'heartbeat'}));};
+  socket.addEventListener('open',()=>{lastSeen=Date.now();beat();});
+  socket.addEventListener('message',()=>{lastSeen=Date.now();});
+  const timer=setInterval(beat,20000);
+  socket.addEventListener('close',()=>clearInterval(timer),{once:true});
+}
 const $=s=>document.querySelector(s),colors=['#ffb483','#8adcc1','#c9a5ff','#9fcaff'],teamNames=['주황팀','초록팀','보라팀','파랑팀'];
 let room=new URLSearchParams(location.search).get('room');if(!room){room=crypto.randomUUID();history.replaceState(null,'','?room='+room);}$('#invite').value=location.href;
 const key='yut-'+room;function read(){try{return JSON.parse(localStorage.getItem(key)||sessionStorage.getItem(key)||'null')}catch{return null}}function save(){const s=JSON.stringify(me);try{localStorage.setItem(key,s)}catch{}try{sessionStorage.setItem(key,s)}catch{}}
@@ -6,7 +15,7 @@ let ws,state=null,joined=false,wantJoin=!!me.token,selectedRoll=null,selectedPie
 const show=(s,v)=>$(s).classList.toggle('hidden',!v),notice=t=>$('#notice').textContent=t;
 function send(m){if(ws?.readyState===1)ws.send(JSON.stringify(m));else notice('서버에 다시 연결 중이에요.');}
 function action(type,extra={}){notice('');send({type,gameId:state?.game?.id,sequence:state?.game?.sequence,...extra});}
-function connect(){ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/yut-ws?room='+room);ws.onopen=()=>{if(wantJoin)send({type:'join',...me});else{$('#join').disabled=false;$('#status').textContent='닉네임을 입력하고 입장하세요.';}};ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='joined'){joined=true;wantJoin=true;me.token=m.token;save();$('#join').disabled=true;$('#spectator').disabled=true;}else if(m.type==='state')render(m);else if(m.type==='error'){notice(m.error);if(!joined)$('#join').disabled=false;}};ws.onclose=e=>{joined=false;$('#join').disabled=true;for(const id of ['roll','move','sendChat','start'])$('#'+id).disabled=true;$('#status').textContent='연결이 끊겨 복귀 중…';if(e.reason==='Reconnected'){notice('다른 창에서 접속했어요. 이 창을 닫아주세요.');return;}if(e.code!==1008)setTimeout(connect,2000);};}
+function connect(){ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/yut-ws?room='+room);attachClientHeartbeat(ws);ws.onopen=()=>{if(wantJoin)send({type:'join',...me});else{$('#join').disabled=false;$('#status').textContent='닉네임을 입력하고 입장하세요.';}};ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='joined'){joined=true;wantJoin=true;me.token=m.token;save();$('#join').disabled=true;$('#spectator').disabled=true;}else if(m.type==='state')render(m);else if(m.type==='error'){notice(m.error);if(!joined)$('#join').disabled=false;}};ws.onclose=e=>{joined=false;$('#join').disabled=true;for(const id of ['roll','move','sendChat','start'])$('#'+id).disabled=true;$('#status').textContent='연결이 끊겨 복귀 중…';if(e.reason==='Reconnected'){notice('다른 창에서 접속했어요. 이 창을 닫아주세요.');return;}if(e.code!==1008)setTimeout(connect,2000);};}
 const posName=n=>n===-1?'대기':n===30?'완주':n===23?'중앙':n===20?'도착 직전':n===5||n===10?'지름길 입구':n<=20?'바깥길 '+n:'지름길';
 const name=id=>state?.members.find(p=>p.id===id)?.nick||'선수';
 const teamName=t=>state?.game?.mode==='solo'?name(state.game.teams[t][0]):teamNames[t];

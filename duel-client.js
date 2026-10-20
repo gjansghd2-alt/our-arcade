@@ -1,3 +1,12 @@
+// Application heartbeat also works through proxies that answer protocol pings.
+function attachClientHeartbeat(socket) {
+  let lastSeen=Date.now();
+  const beat=()=>{if(Date.now()-lastSeen>60000){socket.close();return;}if(socket.readyState===1)socket.send(JSON.stringify({type:'heartbeat'}));};
+  socket.addEventListener('open',()=>{lastSeen=Date.now();beat();});
+  socket.addEventListener('message',()=>{lastSeen=Date.now();});
+  const timer=setInterval(beat,20000);
+  socket.addEventListener('close',()=>clearInterval(timer),{once:true});
+}
 import {renderMatgo} from './matgo-ui.js';
 import {catalog} from './duel-catalog.js';
 const $=s=>document.querySelector(s),el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
@@ -15,7 +24,7 @@ function init(){
  function save(){for(const storage of [localStorage,sessionStorage])try{storage.setItem(key,JSON.stringify(creds));}catch{}}
  function send(m){if(ws?.readyState===1)ws.send(JSON.stringify(m));else notice('서버에 다시 연결 중이에요.');}
  const action=a=>{if(state?.game)send({type:'action',gameId:state.game.id,sequence:state.game.sequence,phase:state.game.phase,round:state.game.round,action:a});};
- function connect(){ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/duel-ws?game='+kind+'&room='+room);ws.onopen=()=>{notice('');$('#status').textContent=creds.token?'이전 자리로 복귀 중…':'연결 완료 · 닉네임을 입력하고 입장해주세요.';$('#join').disabled=false;$('#watch').disabled=false;if(creds.token)send({type:'join',...creds});};ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='joined'){joined=true;creds.token=m.token;save();}else if(m.type==='error')notice(m.error);else if(m.type==='state'){state=m;clockOffset=m.now-Date.now();render();}};ws.onclose=e=>{joined=false;lastGamePaint='';$('#status').textContent='연결이 끊겼어요. 다시 연결 중…';for(const id of ['join','watch','start','sendChat'])$('#'+id).disabled=true;$('#game').querySelectorAll('button').forEach(b=>b.disabled=true);if(e.reason==='Reconnected'){notice('다른 창에서 복귀했어요. 새 창에서 계속해주세요.');return;}if(e.code!==1008)setTimeout(connect,2000);};}
+ function connect(){ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/duel-ws?game='+kind+'&room='+room);attachClientHeartbeat(ws);ws.onopen=()=>{notice('');$('#status').textContent=creds.token?'이전 자리로 복귀 중…':'연결 완료 · 닉네임을 입력하고 입장해주세요.';$('#join').disabled=false;$('#watch').disabled=false;if(creds.token)send({type:'join',...creds});};ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='joined'){joined=true;creds.token=m.token;save();}else if(m.type==='error')notice(m.error);else if(m.type==='state'){state=m;clockOffset=m.now-Date.now();render();}};ws.onclose=e=>{joined=false;lastGamePaint='';$('#status').textContent='연결이 끊겼어요. 다시 연결 중…';for(const id of ['join','watch','start','sendChat'])$('#'+id).disabled=true;$('#game').querySelectorAll('button').forEach(b=>b.disabled=true);if(e.reason==='Reconnected'){notice('다른 창에서 복귀했어요. 새 창에서 계속해주세요.');return;}if(e.code!==1008)setTimeout(connect,2000);};}
  function join(spectator){const nick=$('#nick').value.trim();if(!nick){notice('닉네임을 입력해주세요.');return;}creds.nick=nick;creds.spectator=spectator;save();send({type:'join',...creds});}
  $('#join').onclick=()=>join(false);$('#watch').onclick=()=>join(true);$('#start').onclick=()=>send({type:'start'});$('#seat').onclick=()=>{const self=state?.members.find(p=>p.id===creds.id);send({type:'seat',spectator:self?.seat>=0});};$('#rematch').onclick=()=>send({type:'rematch'});$('#lobby').onclick=()=>send({type:'lobby'});$('#resign').onclick=()=>{if(confirm('이번 대결을 기권할까요?'))action({op:'resign'});};$('#draw').onclick=()=>send({type:'draw',gameId:state.game.id,sequence:state.game.sequence});
  $('#chatForm').onsubmit=e=>{e.preventDefault();send({type:'chat',text:$('#chat').value});$('#chat').value='';};$('#copy').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('#copy').textContent='복사 완료';}catch{$('#invite').select();notice('초대 링크를 복사해주세요.');}};
